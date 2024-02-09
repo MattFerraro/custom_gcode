@@ -2,6 +2,8 @@
 import imageio.v3 as iio
 from skimage.color import rgb2gray
 import math
+DIALECT = "shopbot"
+# DIALECT = "gcode"
 
 
 def main():
@@ -36,19 +38,22 @@ def main():
     commands.append("C6")
 
     # set to absolute position mode
-    commands.append("SA")
+    commands.append(absolute_mode())
 
     # move to origin but at safe z height
-    commands.append(f"J3 0,0,{safe_retract_z}")
+    # commands.append(f"J3 0,0,{safe_retract_z}")
+    commands.append(move_to(0, 0, safe_retract_z))
 
     for x in range(x_samples):
         for y in range(y_samples):
-            print(f"\nNow at hole X: {x}, Y: {y}")
+            # print(f"\nNow at hole X: {x}, Y: {y}")
             x_pos = x_dist * (x + 0.5)
             y_pos = y_dist * (y + 0.5)
 
-            print(f"Moving to {x_pos}, {y_pos}")
-            commands.append(f"J3 {x_pos},{y_pos},{safe_retract_z}")
+            # print(f"Moving to {x_pos}, {y_pos}")
+            # move to the hole location at a safe z height
+            # commands.append(f"J3 {x_pos},{y_pos},{safe_retract_z}")
+            commands.append(jog_to(x_pos, y_pos, safe_retract_z))
             x_frac = x_pos / output_width
             y_frac = y_pos / output_height
 
@@ -62,14 +67,55 @@ def main():
             depth = math.sqrt(intensity) * max_depth
 
             z_pos = -depth
-            commands.append(f"MZ {z_pos}")
-            commands.append(f"JZ {safe_retract_z}")
+            # plunge to depth
+            # commands.append(f"MZ {z_pos}")
+            # commands.append(move_z(z_pos))
+            commands.append(move_to(x_pos, y_pos, z_pos))
+            # retract to a safe height
+            # commands.append(f"JZ {safe_retract_z}")
+            # commands.append(move_z(safe_retract_z))
+            commands.append(jog_to(x_pos, y_pos, safe_retract_z))
 
     # spindle stop
     commands.append("C7")
 
     with open("output.nc", "w") as f:
         f.write("\n".join(commands))
+
+
+def move_to(x, y, z):
+    if DIALECT == "shopbot":
+        return f"M3 {x},{y},{z}"
+    elif DIALECT == "gcode":
+        return f"G01 X{x} Y{y} Z{z}"
+
+
+def jog_to(x, y, z):
+    if DIALECT == "shopbot":
+        return f"J3 {x},{y},{z}"
+    elif DIALECT == "gcode":
+        return f"G00 X{x} Y{y} Z{z}"
+
+
+def move_z(z):
+    if DIALECT == "shopbot":
+        return f"MZ {z}"
+    elif DIALECT == "gcode":
+        return f"G01 Z{z}"
+
+
+def jog_z(z):
+    if DIALECT == "shopbot":
+        return f"JZ {z}"
+    elif DIALECT == "gcode":
+        return f"G00 Z{z}"
+
+
+def absolute_mode():
+    if DIALECT == "shopbot":
+        return "SA"
+    elif DIALECT == "gcode":
+        return "G90"
 
 
 if __name__ == "__main__":
