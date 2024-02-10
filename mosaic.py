@@ -1,6 +1,8 @@
+import numpy as np
 # import skimage as ski
 import imageio.v3 as iio
-from skimage.color import rgb2gray
+from skimage.color import rgb2gray, gray2rgb
+from skimage.draw import disk
 import math
 DIALECT = "shopbot"
 # DIALECT = "gcode"
@@ -10,16 +12,21 @@ def main():
     # inputs
     filename = "dali.jpg"
     output_width = 12.93  # inches
-    x_samples = 13
-    x_dist = output_width / (x_samples + 1)
-    v_bit_half_angle = 30  # degrees
+    x_samples = 50
+    x_dist = output_width / (x_samples)
+    v_bit_half_angle = 45  # degrees
     safe_retract_z = 0.5  # inches -- this assumes we are zeroed on to the top of the material!
-    max_depth = 0.4  # inches
+    max_depth = 0.25  # inches
 
     original = iio.imread(filename)
     grayscale = rgb2gray(original)
     print(grayscale.shape)
+
+    simulation = grayscale.copy() * 0.0
+
     image_height, image_width = grayscale.shape
+    pixels_per_inch = image_width / output_width
+    print("Pixels per inch: ", pixels_per_inch)
 
     aspect_ratio = image_width / image_height
     print(f"Aspect ratio: {aspect_ratio}")
@@ -29,7 +36,7 @@ def main():
     print(f"Physical image will be {output_width} by {output_height} inches")
 
     y_samples = int(x_samples / aspect_ratio)
-    y_dist = output_height / (y_samples + 1)
+    y_dist = output_height / (y_samples)
     print(f"Image will be {x_samples} holes wide by {y_samples} holes tall")
 
     commands = []
@@ -43,6 +50,11 @@ def main():
     # move to origin but at safe z height
     # commands.append(f"J3 0,0,{safe_retract_z}")
     commands.append(move_to(0, 0, safe_retract_z))
+
+    radius = max_depth * math.tan(math.radians(v_bit_half_angle)) * 2.0
+    print("Max radius in inches: ", radius)
+    radius_in_pixels = radius * pixels_per_inch
+    print("Max radius in pixels: ", radius_in_pixels)
 
     for x in range(x_samples):
         for y in range(y_samples):
@@ -63,8 +75,18 @@ def main():
             intensity = grayscale[y_pixel, x_pixel]
             # intensity is 0->255 but depth is 0->max_depth
             # and brightness of the hole goes up as depth^2 not linearly with depth
-            intensity = intensity / 255
-            depth = math.sqrt(intensity) * max_depth
+            # intensity = intensity
+            depth = math.sqrt(intensity) * max_depth - 0.1
+
+            # simulation[y_pixel, x_pixel] = 1
+            radius = depth * math.tan(math.radians(v_bit_half_angle))
+            radius_in_pixels = radius * pixels_per_inch
+            # print(
+            #     f"intensity: {intensity} depth: {depth} radius: {radius} radius_in_pixels: {radius_in_pixels}")
+
+            rr, cc = disk((y_pixel, x_pixel), radius_in_pixels,
+                          shape=(image_height, image_width))
+            simulation[rr, cc] = 1
 
             z_pos = -depth
             # plunge to depth
@@ -81,6 +103,9 @@ def main():
 
     with open("output.nc", "w") as f:
         f.write("\n".join(commands))
+
+    simulation_rgb = gray2rgb(simulation) * 255
+    iio.imwrite("simulation.png", simulation_rgb.astype(np.uint8))
 
 
 def move_to(x, y, z):
