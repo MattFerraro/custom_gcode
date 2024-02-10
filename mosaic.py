@@ -15,7 +15,8 @@ def main():
     x_samples = 50
     x_dist = output_width / (x_samples)
     v_bit_half_angle = 45  # degrees
-    safe_retract_z = 0.5  # inches -- this assumes we are zeroed on to the top of the material!
+    # inches -- this assumes we are zeroed on to the top of the material!
+    safe_retract_z = 0.15
     max_depth = 0.25  # inches
 
     original = iio.imread(filename)
@@ -55,6 +56,11 @@ def main():
     print("Max radius in inches: ", radius)
     radius_in_pixels = radius * pixels_per_inch
     print("Max radius in pixels: ", radius_in_pixels)
+
+    min_x = 0
+    min_y = 0
+    max_x = 0
+    max_y = 0
 
     for x in range(x_samples):
         for y in range(y_samples):
@@ -98,6 +104,11 @@ def main():
             # commands.append(move_z(safe_retract_z))
             commands.append(jog_to(x_pos, y_pos, safe_retract_z))
 
+            if x_pos > max_x:
+                max_x = x_pos
+            if y_pos > max_y:
+                max_y = y_pos
+
     # spindle stop
     commands.append("C7")
 
@@ -106,6 +117,8 @@ def main():
 
     simulation_rgb = gray2rgb(simulation) * 255
     iio.imwrite("simulation.png", simulation_rgb.astype(np.uint8))
+
+    print(f"Max X: {max_x} Max Y: {max_y}")
 
 
 def move_to(x, y, z):
