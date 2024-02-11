@@ -15,8 +15,8 @@ def main():
     x_samples = 50
     x_dist = output_width / (x_samples)
     v_bit_half_angle = 45  # degrees
-    # inches -- this assumes we are zeroed on to the top of the material!
-    safe_retract_z = 0.15
+    # this retract height assumes we are zeroed on to the top of the material!
+    safe_retract_z = 0.15  # inches
     max_depth = 0.25  # inches
 
     original = iio.imread(filename)
